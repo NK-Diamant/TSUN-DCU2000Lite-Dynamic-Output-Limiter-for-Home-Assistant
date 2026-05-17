@@ -1,3 +1,8 @@
+📖 **[Klicke hier für die deutsche Version der Anleitung / Click here for the German version](README_DE.md)**
+
+---
+
+
 This repository explain how to create a dynamic delimiter for Tsun DCU2000Lite output -> Inverter by using Nginx Proxy Manager & Node-RED
 
 ---------------–-------------------------------------------------
