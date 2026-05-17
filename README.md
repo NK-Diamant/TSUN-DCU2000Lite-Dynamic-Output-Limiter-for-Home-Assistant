@@ -6,7 +6,7 @@ This repository explain how to create a dynamic delimiter for Tsun DCU2000Lite o
 
 An intelligent, hardware-friendly control loop for Node-RED and Home Assistant to fully tame the laggy regulation of **TSUN battery storage systems (SolarCan / DCU2000lite / Gen3 Inverters)**.
 
-This tool emulates a single-phase Shelly Pro EM data protocol and solves the hardware-induced oscillation issues of the TSUN smart meter mode purely through software mathematics. It provides a **silky-smooth zero-export control during the day** and a **stable constant value mode for the night**.
+This tool emulates a single-phase Shelly Pro EM data protocol and solves the hardware-induced oscillation issues of the TSUN smart meter mode purely through software mathematics. It provides a **silky-smooth zero-export control** and a **stable constant value mode**.
 
 ---
 
