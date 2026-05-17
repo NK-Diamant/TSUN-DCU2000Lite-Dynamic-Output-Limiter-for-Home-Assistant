@@ -35,7 +35,7 @@ Erstelle unter **Einstellungen ➡️ Geräte & Dienste ➡️ Helfer** folgende
 
 ### 2. Einstellungen in der TSUN-App
 * Richtet euren lokalen virtuellen Shelly-Zähler (`c049efc02345`) ein.
-* Stellt den Installationsort in den Zähler-Einstellungen zwingend auf **„Leistung“**! 
+* Stellt den Installationsort in den Zähler-Einstellungen den Installationsort zwingend auf **„Stromverbrauch“**! 
 * *Hinweis zur Logik:* Auch wenn es in der App "Leistung" heißt, versucht die TSUN-Firmware den empfangenen Wert intern immer gegen Null zu regeln.
 
 ### 3. Node-RED Import
