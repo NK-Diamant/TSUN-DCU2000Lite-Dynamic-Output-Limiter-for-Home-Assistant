@@ -2,7 +2,7 @@
 
 Ein intelligenter, materialschonender Regelkreis für Node-RED und Home Assistant, um die träge Regelung von **TSUN-Speichersystemen (SolarCan / DCU2000lite / Gen3-Wechselrichter)** zu zähmen. 
 
-Dieses Tool emuliert ein einphasiges Shelly Pro EM Datenprotokoll und löst die hardwarebedingten Schwingungsprobleme des TSUN-Zählermodus ("Leistung") rein über Software-Mathematik. Es bietet eine **weiche Nulleinspeisung am Tag** sowie einen **stabilen Festwert-Modus für die Nacht**.
+Dieses Tool emuliert ein einphasiges Shelly Pro EM Datenprotokoll und löst die hardwarebedingten Schwingungsprobleme des TSUN-Zählermodus ("Leistung") rein über Software-Mathematik. Es bietet eine **weiche Nulleinspeisung** sowie einen **stabilen Festwert-Modus**.
 
 ---
 
