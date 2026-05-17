@@ -2,7 +2,7 @@ This repository explain how to create a dynamic delimiter for Tsun DCU2000Lite o
 
 ---------------–-------------------------------------------------
 
-# TSUN DCU Dynamic Output Limiter 🔋☀️
+# TSUN DCU2000Lite Dynamic Output Limiter 🔋☀️
 
 An intelligent, hardware-friendly control loop for Node-RED and Home Assistant to fully tame the laggy regulation of **TSUN battery storage systems (SolarCan / DCU2000lite / Gen3 Inverters)**.
 
