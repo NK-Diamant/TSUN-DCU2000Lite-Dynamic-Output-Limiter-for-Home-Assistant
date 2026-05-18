@@ -1,3 +1,6 @@
+**[Klicke hier für die deutsche Version](README_DE.md)**
+
+
 # TSUN DCU2000Lite Dynamic Output Limiter 🔋☀️
 
 An intelligent, hardware-friendly control loop for Node-RED and Home Assistant designed to tame the sluggish regulation behavior of **TSUN storage systems (SolarCan / DCU2000lite / Gen3 inverters)**.
