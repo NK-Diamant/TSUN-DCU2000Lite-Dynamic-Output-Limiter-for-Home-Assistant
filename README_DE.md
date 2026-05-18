@@ -34,6 +34,7 @@ Der Flow ist in **drei physisch autarke Zeilen** aufgeteilt, die sich konfliktfr
 Erstelle unter **Einstellungen ➡️ Geräte & Dienste ➡️ Helfer** folgende zwei Entitäten:
 1. **Dropdown (input_select.regelmodus):** Optionen: `Dynamischer Verbrauch` und `Fester Wert`
 2. **Nummer (input_number.wunsch_einspeisung):** Bereich `0` bis `800` (Schrittweite 1 oder 5), Anzeigemodus: Schieberegler
+3. **Nummer (input_number.netz_puffer):** Bereich `0` bis `100` (Schrittweite 1 oder 5), Anzeigemodus: Schieberegler
 
 ### 2. Einstellungen in der TSUN-App
 * Richtet euren lokalen virtuellen Shelly-Zähler (`c049efc02345`) ein.
