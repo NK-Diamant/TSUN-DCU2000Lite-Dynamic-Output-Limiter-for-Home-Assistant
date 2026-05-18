@@ -22,7 +22,7 @@ Dieses Tool emuliert ein einphasiges Shelly Pro EM Datenprotokoll und löst die 
 
 Der Flow ist in **drei physisch autarke Zeilen** aufgeteilt, die sich konfliktfrei im Hintergrund über den Arbeitsspeicher (`flow` und `global`) unterhalten:
 
-1. **Zeile 1 (Intelligente Hausverbrauch-Bremse & Spitzenfilter):** Holt im 2-Minuten-Intervall den aktuellen Verbrauch. Über eine switch- und trigger-Weiche fließen Werte bis 800W sofort durch. Lastspitzen über 800W (z. B. Kaffeemaschine, Wasserkocher) werden für 1-2 Minuten blockiert. Kurze Peaks von unter einer Minute werden so vollständig ignoriert, was den Akku schont.
+1. **Zeile 1 (Intelligente Hausverbrauch-Bremse & Spitzenfilter):** Holt im 2-Minuten-Intervall den aktuellen Verbrauch. Über eine switch- und trigger-Weiche fließen Werte bis 800W sofort durch. Lastspitzen über 800W (z. B. Kaffeemaschine, Wasserkocher) werden für 1-2 Minuten blockiert. Kurze Peaks von unter zwei Minuten werden so vollständig ignoriert, was den Akku schont.
 2. **Zeile 2 (HTTP-Echtzeit-Poll):** Antwortet im Sekundentakt auf den `/rpc/Shelly.GetStatus`-Poll des TSUN. Berechnet live die Differenz unter Einbezug der Rampe und des Offsets.
 3. **Zeile 3 (Dashboard-Weiche):** Schaltet die Logik im Hintergrund basierend auf der HA-Auswahlliste zwischen `dyn` (Tag) und `fix` (Nacht) um.
 
