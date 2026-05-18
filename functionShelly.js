@@ -34,6 +34,7 @@ if (modus === 'dyn') {
   // =================================================================================
   let treppenstufe_roh = parseFloat(flow.get('hausverbrauch_gebremst')) || parseFloat(ha_bereit[entity_slider].state) || 0.0;
   let treppenstufe_ziel = treppenstufe_roh > 800.0 ? 800.0 : treppenstufe_roh;
+  let netz_puffer = parseFloat(ha_bereit["input_number.netz_puffer"]?.state || 0.0);
 
   let letzter_gesendeter_wert = context.get('tsun_rampe_letzter_wert') || aktuelle_einspeisung;
   let max_aenderung_pro_sekunde = 10.0;
@@ -52,7 +53,7 @@ if (modus === 'dyn') {
   context.set('tsun_rampe_letzter_wert', rampen_ziel);
 
   soll_wert = rampen_ziel;
-  roh_differenz = soll_wert - aktuelle_einspeisung;
+  roh_differenz = (soll_wert - netz_puffer) - aktuelle_einspeisung;
 
   // Berechne das Hysteresefenster dynamisch (4% vom aktuellen Sollwert, mindestens 10W)
   let hysterese_fenster = Math.max(10.0, soll_wert * 0.04);
@@ -116,6 +117,7 @@ msg.payload = {
 // DIAGNOSE-BLOCK (Zeigt alle Zustände und deine 1.0er Live im Browser-JSON)
 msg.payload.diagnose = {
   "gewaehlter_modus": modus,
+  "eingestellter_netz_puffer_watt": parseFloat(ha_bereit["input_number.netz_puffer"]?.state || 0.0),
   "treppenstufe_ziel_ha": flow.get('hausverbrauch_gebremst'),
   "rampe_aktueller_soll_wert": soll_wert,
   "aktuelle_einspeisung_live_flackernd": aktuelle_einspeisung,
