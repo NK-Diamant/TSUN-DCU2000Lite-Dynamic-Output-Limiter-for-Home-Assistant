@@ -1,3 +1,5 @@
+**[English Version](README.md)**
+
 # TSUN DCU2000Lite Dynamic Output Limiter 🔋☀️
 
 Ein intelligenter, materialschonender Regelkreis für Node-RED und Home Assistant, um die träge Regelung von **TSUN-Speichersystemen (SolarCan / DCU2000lite / Gen3-Wechselrichter)** zu zähmen. 
