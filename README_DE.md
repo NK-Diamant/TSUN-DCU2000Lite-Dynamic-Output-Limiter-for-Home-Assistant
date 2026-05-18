@@ -50,6 +50,10 @@ Erstelle unter **Einstellungen ➡️ Geräte & Dienste ➡️ Helfer** folgende
 
 **[Klicke hier / Click here](flows.json)**
 
+## 📄 Node-RED Function Shelly (Java)
+
+**[Klicke hier / Click here](functionShelly.js)**
+
 ## 🤝 Mitwirken & Lizenz
 
 Dieses Projekt ist Open-Source. Wenn du Optimierungen für den Regelkreis hast (z.B. Anpassungen für andere Batterie-Hersteller an der DCU), erstelle gerne einen Pull Request oder öffne ein Issue!
