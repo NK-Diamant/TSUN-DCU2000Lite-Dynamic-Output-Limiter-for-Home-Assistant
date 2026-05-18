@@ -47,4 +47,8 @@ Create the following two helpers under **Settings ➡️ Devices & Services ➡�
 
 **[Klicke hier / Click here](flows.json)**
 
+## 📄 Node-RED Function Shelly (Java)
+
+**[Klicke hier / Click here](functionShelly.js)**
+
 
