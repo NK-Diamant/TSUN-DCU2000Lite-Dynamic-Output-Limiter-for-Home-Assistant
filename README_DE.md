@@ -13,6 +13,8 @@ Dieses Tool emuliert ein einphasiges Shelly Pro EM Datenprotokoll und löst die 
 * **10W Slew-Rate-Limiter (Rampe):** Verhindert, dass die Einspeisung bei schlagartigen Lastabfällen (z.B. Abschalten der Waschmaschine) panisch auf 0 Watt einbricht. Der Wert gleitet sanft in 10-Watt-Schritten pro Sekunde nach unten.
 * **800W Software-Clipping:** Kappt Berechnungen bei Großverbrauchern (z.B. Herd mit 3000W) hart bei der physischen Grenze von 800W. Fällt die Last, startet die Rampe ohne Totzeit sofort ab der 800W-Kante abwärts.
 * **Nacht-Offset (+10W):** Schlägt im Festwertmodus automatisch 10 Watt auf den Dashboard-Slider auf, um das hardwareseitige 20W-Totband des TSUN-Wechselrichters zu überwinden. Der Speicher rastet nachts präzise auf dem Wunschwert ein (Toleranz: ~4 Watt).
+* **Mitahmende Prozent-Hysterese & 1.0-Halte-Logik:** Die Komfortzone passt sich prozentual (4 %) an das Leistungsniveau an. Bei Erreichen des Ziels wird statt einer kritischen 0.0 eine minimale 1.0 gesendet. Das hält den physischen Gegendruck im Lastmodus aufrecht und eliminiert das wellenförmige Schwingen vollständig.
+* **Fail-Safe-Schutzschild:** Fängt leere Datenlöcher beim Deployen oder bei kurzen WLAN-Aussetzern des Shelly-Sensors ab. Node-RED sendet in dieser Sekunde automatisch ein sicheres Standardpaket, wodurch ein harter Absturz (0W-Hardstopp) der TSUN-Firmware unmöglich wird.
 
 ---
 
