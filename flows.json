@@ -1,6 +1,6 @@
 [
     {
-        "id": "emulator_status",
+        "id": "pact_emulator_status",
         "type": "http in",
         "z": "574dc86ef8f55d6a",
         "name": "Shelly GetStatus",
@@ -18,7 +18,7 @@
         ]
     },
     {
-        "id": "response",
+        "id": "pact_response",
         "type": "http response",
         "z": "574dc86ef8f55d6a",
         "name": "Antwort an Speicher",
@@ -26,7 +26,7 @@
         "headers": {
             "content-type": "application/json"
         },
-        "x": 840,
+        "x": 900,
         "y": 300,
         "wires": []
     },
@@ -35,7 +35,7 @@
         "type": "function",
         "z": "574dc86ef8f55d6a",
         "name": "function Shelly",
-        "func": "// ==========================================\n// CONFIG: Bitte trage hier deine echten HA-Entity-Namen ein!\n// ==========================================\nlet entity_tsun_output = \"sensor.shelly1pmminig3_e4b32329a0e8_leistung\"; // Dein Echtzeit-Sensor\nlet entity_slider = \"input_number.wunsch_einspeisung\"; // Dein Slider für den Nacht-Festwert\n// ==========================================\n\n// 1. DER DEPLOY-SCHUTZSCHILD: Prüfe, ob Home Assistant überhaupt schon wach ist\nlet ha_bereit = global.get('homeassistant.homeAssistant.states');\nif (!ha_bereit || !ha_bereit[entity_tsun_output]) {\n  // DEIN CODESIEG: act_power auf 1.0 gesetzt, damit der TSUN beim Deploy nicht mehr hüpft!\n  msg.payload = {\n    \"sys\": { \"mac\": \"C049EFC02345\", \"unixtime\": Math.floor(Date.now() / 1000) },\n    \"em1:0\": { \"id\": 0, \"current\": 0.0, \"voltage\": 230.15, \"act_power\": 1.0, \"aprt_power\": 5.0, \"pf\": 0.98, \"freq\": 50.01, \"calibration\": \"factory\" },\n    \"em1data:0\": { \"id\": 0, \"total_act_energy\": 12345.67, \"total_act_ret_energy\": 0.00 },\n    \"switch:0\": { \"id\": 0, \"output\": true }\n  };\n  msg.headers = { \"Content-Type\": \"application/json\" };\n  return msg;\n}\n\n// AB HIER SIND DIE DATEN GARANTIERT DA:\nlet modus = flow.get('tsun_modus') || 'dyn';\nlet formatiertePower = 0.0;\nlet soll_wert = 0.0;\nlet roh_differenz = 0.0;\n\n// Sicherer Abruf des Live-Zustands ohne Absturzrisiko\nlet aktuelle_einspeisung = Math.abs(parseFloat(ha_bereit[entity_tsun_output].state) || 0.0);\n\nif (modus === 'dyn') {\n  // =================================================================================\n  // MODUS A: DYNAMISCH (TAG) -> MIT 800W-KAPPUNG, 10W-RAMPE UND %-HYSTERESE\n  // =================================================================================\n  let treppenstufe_roh = parseFloat(flow.get('hausverbrauch_gebremst')) || parseFloat(ha_bereit[entity_slider].state) || 0.0;\n  let treppenstufe_ziel = treppenstufe_roh > 800.0 ? 800.0 : treppenstufe_roh;\n\n  let letzter_gesendeter_wert = context.get('tsun_rampe_letzter_wert') || aktuelle_einspeisung;\n  let max_aenderung_pro_sekunde = 10.0;\n  let abweichung_zur_stufe = treppenstufe_ziel - letzter_gesendeter_wert;\n\n  let rampen_ziel = letzter_gesendeter_wert;\n\n  if (abweichung_zur_stufe > max_aenderung_pro_sekunde) {\n    rampen_ziel += max_aenderung_pro_sekunde;\n  } else if (abweichung_zur_stufe < -max_aenderung_pro_sekunde) {\n    rampen_ziel -= max_aenderung_pro_sekunde;\n  } else {\n    rampen_ziel = treppenstufe_ziel;\n  }\n\n  context.set('tsun_rampe_letzter_wert', rampen_ziel);\n\n  soll_wert = rampen_ziel;\n  roh_differenz = soll_wert - aktuelle_einspeisung;\n\n  // Berechne das Hysteresefenster dynamisch (4% vom aktuellen Sollwert, mindestens 10W)\n  let hysterese_fenster = Math.max(10.0, soll_wert * 0.04);\n\n  // DEIN CODESIEG: Wenn wir nah genug dran sind, senden wir 1.0 statt 0.0.\n  // Das gibt dem TSUN den perfekten \"Gegendruck\", um ohne Nachgeben oder Hüpfen auf der Stufe zu parken!\n  if (Math.abs(roh_differenz) < hysterese_fenster) {\n    formatiertePower = 1.0;\n  } else {\n    let daempfungs_faktor = 0.6;\n    formatiertePower = parseFloat((roh_differenz * daempfungs_faktor).toFixed(2));\n  }\n\n} else {\n  // =================================================================================\n  // MODUS B: FESTWERT (NACHT) -> Ungebremster Volldampf mit +10W Offset\n  // =================================================================================\n  let slider_wert = parseFloat(ha_bereit[entity_slider].state) || 0.0;\n  soll_wert = slider_wert + 10.0;\n  roh_differenz = soll_wert - aktuelle_einspeisung;\n\n  let hysterese_fenster = Math.max(10.0, soll_wert * 0.04);\n\n  // DEIN CODESIEG: Auch nachts stabiler Halt auf 1.0 ohne Absacken\n  if (Math.abs(roh_differenz) < hysterese_fenster) {\n    formatiertePower = 1.0;\n  } else {\n    let daempfungs_faktor = 1.0;\n    if (Math.abs(roh_differenz) < 40.0) {\n      daempfungs_faktor = 0.5;\n    }\n    formatiertePower = parseFloat((roh_differenz * daempfungs_faktor).toFixed(2));\n  }\n\n  context.set('tsun_rampe_letzter_wert', undefined);\n}\n\n// Physikalische Derivate berechnen\nlet voltage = 230.15;\nlet current = parseFloat((Math.abs(formatiertePower / voltage)).toFixed(2));\nlet pf = 0.98;\nlet grid_freq = 50.01;\n\nlet scheinLeistung = Math.abs(formatiertePower) > 0 ? parseFloat((Math.abs(formatiertePower / pf)).toFixed(2)) : 5.00;\nlet festerZaehlerstand = 12345.67;\nlet aktuelleUnixzeit = Math.floor(Date.now() / 1000);\n\n// Das originale, einphasige Shelly Pro EM JSON\nmsg.payload = {\n  \"sys\": { \"mac\": \"C049EFC02345\", \"unixtime\": aktuelleUnixzeit },\n  \"em1:0\": {\n    \"id\": 0, \"current\": current, \"voltage\": voltage,\n    \"act_power\": formatiertePower,\n    \"aprt_power\": scheinLeistung,\n    \"pf\": pf, \"freq\": grid_freq, \"calibration\": \"factory\"\n  },\n  \"em1data:0\": { \"id\": 0, \"total_act_energy\": festerZaehlerstand, \"total_act_ret_energy\": 0.00 },\n  \"switch:0\": { \"id\": 0, \"output\": true }\n};\n\n// DIAGNOSE-BLOCK (Zeigt alle Zustände und deine 1.0er Live im Browser-JSON)\nmsg.payload.diagnose = {\n  \"gewaehlter_modus\": modus,\n  \"treppenstufe_ziel_ha\": flow.get('hausverbrauch_gebremst'),\n  \"rampe_aktueller_soll_wert\": soll_wert,\n  \"aktuelle_einspeisung_live_flackernd\": aktuelle_einspeisung,\n  \"dynamisches_hysterese_fenster_watt\": Math.max(10.0, soll_wert * 0.04),\n  \"unbearbeitete_roh_differenz\": roh_differenz,\n  \"ausgegebenes_json_act_power\": formatiertePower\n};\n\nmsg.headers = { \"Content-Type\": \"application/json\" };\nreturn msg;\n",
+        "func": "// ==========================================\n// CONFIG\n// ==========================================\nlet entity_tsun_output = \"sensor.shelly1pmminig3_e4b32329a0e8_leistung\"; // Dein Echtzeit-Sensor\nlet entity_slider = \"input_number.wunsch_einspeisung\"; // Dein Slider für den Nacht-Festwert\nlet entity_puffer = \"input_number.netz_puffer\"; // Dein Slider für den Netz-Puffer\nlet entity_debug = \"input_number.act_power_debug\"; // Debug Sensor\n// ==========================================\n\n// 1. DER DEPLOY-SCHUTZSCHILD: Prüfe, ob Home Assistant überhaupt schon wach ist\nlet ha_bereit = global.get('homeassistant.homeAssistant.states');\nif (!ha_bereit || !ha_bereit[entity_tsun_output]) {\n  // act_power auf 1.0 gesetzt, damit der TSUN beim Deploy nicht mehr hüpft!\n  msg.payload = {\n    \"sys\": { \"mac\": \"C049EFC02345\", \"unixtime\": Math.floor(Date.now() / 1000) },\n    \"em1:0\": { \"id\": 0, \"current\": 0.0, \"voltage\": 230.15, \"act_power\": 1.0, \"aprt_power\": 5.0, \"pf\": 0.98, \"freq\": 50.01, \"calibration\": \"factory\" },\n    \"em1data:0\": { \"id\": 0, \"total_act_energy\": 12345.67, \"total_act_ret_energy\": 0.00 },\n    \"switch:0\": { \"id\": 0, \"output\": true }\n  };\n  msg.headers = { \"Content-Type\": \"application/json\" };\n  return msg;\n}\n\n// AB HIER SIND DIE DATEN GARANTIERT DA:\nlet modus = flow.get('tsun_modus') || 'dyn';\nlet formatiertePower = 0.0;\nlet roh_target = 0.0;\nlet soll_wert = 0.0;\nlet roh_differenz = 0.0;\nlet umschalt_schutz_aktiv = false;\n\n// Sicherer Abruf des Live-Zustands mit Fallback auf letzten gültigen Wert\nlet raw = ha_bereit[entity_tsun_output]?.state;\nlet aktuelle_einspeisung;\nif (raw && raw !== 'unavailable' && raw !== 'unknown') {\n  aktuelle_einspeisung = Math.abs(parseFloat(raw) || 0.0);\n  context.set('letzte_gueltige_einspeisung', aktuelle_einspeisung);\n} else {\n  aktuelle_einspeisung = context.get('letzte_gueltige_einspeisung') || 0.0;\n}\n\n// Sicherer Abruf des Sliders mit Fallback auf letzten gültigen Wert\nlet raw_slider = ha_bereit[entity_slider]?.state;\nlet slider_wert;\nif (raw_slider && raw_slider !== 'unavailable' && raw_slider !== 'unknown') {\n  slider_wert = parseFloat(raw_slider) || 0.0;\n  context.set('letzter_gueltiger_slider', slider_wert);\n} else {\n  slider_wert = context.get('letzter_gueltiger_slider') || 0.0;\n}\n\n// =================================================================================\n// INTELLIGENTE UMSCHALT-KUPPLUNG (3 SEKUNDEN HALTEZEIT BEIM MODUSWECHSEL)\n// =================================================================================\nlet letzter_modus = context.get('tsun_letzter_modus') || modus;\nlet umschalt_timer = context.get('tsun_umschalt_timer') || 0;\n\nif (modus !== letzter_modus) {\n  umschalt_timer = 3;\n  context.set('tsun_letzter_modus', modus);\n  context.set('tsun_letztes_act_power', 1.0);\n}\n\nif (umschalt_timer > 0) {\n  umschalt_schutz_aktiv = true;\n  formatiertePower = 1.0;\n  umschalt_timer--;\n  context.set('tsun_umschalt_timer', umschalt_timer);\n  if (aktuelle_einspeisung > 10) {\n    context.set('tsun_rampe_letzter_wert', aktuelle_einspeisung);\n  }\n}\n\n// =================================================================================\n// HIER LÄUFT DIE NORMALE REGLERLOGIK (WIRD WÄHREND DER KUPPLUNG ÜBERSPRUNGEN)\n// =================================================================================\nif (!umschalt_schutz_aktiv) {\n\n  if (modus === 'dyn') {\n    let raw_hausverbrauch = flow.get('hausverbrauch_gebremst');\n    let hausverbrauch;\n    if (raw_hausverbrauch !== null && raw_hausverbrauch !== undefined) {\n      hausverbrauch = parseFloat(raw_hausverbrauch) || 0.0;\n      context.set('letzter_gueltiger_hausverbrauch', hausverbrauch);\n    } else {\n      hausverbrauch = context.get('letzter_gueltiger_hausverbrauch') || slider_wert || 0.0;\n    }\n    roh_target = hausverbrauch > 800.0 ? 800.0 : hausverbrauch;\n  } else {\n    roh_target = slider_wert + 10.0;\n  }\n\n  let letzter_gesendeter_wert = context.get('tsun_rampe_letzter_wert');\n  if (letzter_gesendeter_wert === undefined) {\n    letzter_gesendeter_wert = aktuelle_einspeisung;\n  }\n\n  let max_aenderung_pro_sekunde = 10.0;\n  let abweichung_zur_stufe = roh_target - letzter_gesendeter_wert;\n  let rampen_ziel = letzter_gesendeter_wert;\n\n  if (abweichung_zur_stufe > max_aenderung_pro_sekunde) {\n    rampen_ziel += max_aenderung_pro_sekunde;\n  } else if (abweichung_zur_stufe < -max_aenderung_pro_sekunde) {\n    rampen_ziel -= max_aenderung_pro_sekunde;\n  } else {\n    rampen_ziel = roh_target;\n  }\n\n  context.set('tsun_rampe_letzter_wert', rampen_ziel);\n  soll_wert = rampen_ziel;\n\n  let netz_puffer = parseFloat(ha_bereit[entity_puffer]?.state || 0.0);\n\n  if (modus === 'dyn') {\n    roh_differenz = (soll_wert - netz_puffer) - aktuelle_einspeisung;\n  } else {\n    roh_differenz = soll_wert - aktuelle_einspeisung;\n  }\n\n  let hysterese_fenster = Math.max(10.0, soll_wert * 0.04);\n  let letztes_act_power = context.get('tsun_letztes_act_power') || 1.0;\n\n  if (Math.abs(roh_differenz) < hysterese_fenster) {\n    formatiertePower = 1.0;\n  } else if (roh_differenz > 0) {\n    let schritt = Math.abs(roh_differenz) < 40.0 ? 5.0 : 10.0;\n    formatiertePower = parseFloat(Math.min(letztes_act_power + schritt, roh_differenz).toFixed(2));\n  } else {\n    let schritt = Math.abs(roh_differenz) < 40.0 ? 5.0 : 10.0;\n    formatiertePower = parseFloat(Math.max(letztes_act_power - schritt, roh_differenz).toFixed(2));\n  }\n\n  context.set('tsun_letztes_act_power', formatiertePower);\n}\n\n// Physikalische Derivate berechnen\nlet voltage = 230.15;\nlet current = parseFloat((Math.abs(formatiertePower / voltage)).toFixed(2));\nlet pf = 0.98;\nlet grid_freq = 50.01;\n\nlet scheinLeistung = Math.abs(formatiertePower) > 0 ? parseFloat((Math.abs(formatiertePower / pf)).toFixed(2)) : 5.00;\nlet festerZaehlerstand = 12345.67;\nlet aktuelleUnixzeit = Math.floor(Date.now() / 1000);\n\n// Das originale, einphasige Shelly Pro EM JSON\nmsg.payload = {\n  \"sys\": { \"mac\": \"C049EFC02345\", \"unixtime\": aktuelleUnixzeit },\n  \"em1:0\": {\n    \"id\": 0, \"current\": current, \"voltage\": voltage,\n    \"act_power\": formatiertePower,\n    \"aprt_power\": scheinLeistung,\n    \"pf\": pf, \"freq\": grid_freq, \"calibration\": \"factory\"\n  },\n  \"em1data:0\": { \"id\": 0, \"total_act_energy\": festerZaehlerstand, \"total_act_ret_energy\": 0.00 },\n  \"switch:0\": { \"id\": 0, \"output\": true }\n};\n\n// DIAGNOSE-BLOCK\nmsg.payload.diagnose = {\n  \"gewaehlter_modus\": modus,\n  \"umschalt_kupplung_aktiv\": umschalt_schutz_aktiv,\n  \"kupplung_restzeit_sekunden\": umschalt_timer,\n  \"eingestellter_netz_puffer_watt\": parseFloat(ha_bereit[entity_puffer]?.state || 0.0),\n  \"treppenstufe_ziel_ha\": flow.get('hausverbrauch_gebremst'),\n  \"rampe_aktueller_soll_wert\": umschalt_schutz_aktiv ? \"GEFROREN\" : soll_wert,\n  \"aktuelle_einspeisung_live_flackernd\": aktuelle_einspeisung,\n  \"sensor_status\": raw || \"unavailable\",\n  \"slider_status\": raw_slider || \"unavailable\",\n  \"dynamisches_hysterese_fenster_watt\": Math.max(10.0, soll_wert * 0.04),\n  \"unbearbeitete_roh_differenz\": roh_differenz,\n  \"letztes_act_power_vor_berechnung\": context.get('tsun_letztes_act_power'),\n  \"ausgegebenes_json_act_power\": formatiertePower\n};\n\nmsg.headers = { \"Content-Type\": \"application/json\" };\n\n// =================================================================================\n// DEBUG: Nur schreiben wenn Debug-Schalter aktiv ist\n// =================================================================================\nlet debug_aktiv = ha_bereit[\"input_boolean.debug_modus\"]?.state === \"on\";\n\n// if (debug_aktiv) {\n//   fetch('http://supervisor/core/api/states/input_number.act_power_debug', {\n//     method: 'POST',\n//     headers: {\n//       'Authorization': 'Bearer ' + global.get('homeassistant.hassioToken'),\n//       'Content-Type': 'application/json'\n//     },\n//     body: JSON.stringify({ state: formatiertePower })\n//   });\n// }\n\nreturn msg;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
@@ -69,8 +69,8 @@
         "from": "",
         "to": "",
         "reg": false,
-        "x": 1250,
-        "y": 160,
+        "x": 1830,
+        "y": 220,
         "wires": [
             []
         ]
@@ -112,7 +112,7 @@
             }
         ],
         "x": 290,
-        "y": 440,
+        "y": 580,
         "wires": [
             [
                 "tsun_modus_switch_neu"
@@ -142,7 +142,7 @@
         "repair": false,
         "outputs": 2,
         "x": 570,
-        "y": 440,
+        "y": 580,
         "wires": [
             [
                 "tsun_save_mode_dyn_neu"
@@ -171,8 +171,8 @@
         "from": "",
         "to": "",
         "reg": false,
-        "x": 810,
-        "y": 400,
+        "x": 930,
+        "y": 540,
         "wires": [
             []
         ]
@@ -196,8 +196,8 @@
         "from": "",
         "to": "",
         "reg": false,
-        "x": 800,
-        "y": 480,
+        "x": 920,
+        "y": 640,
         "wires": [
             []
         ]
@@ -227,7 +227,7 @@
         "y": 180,
         "wires": [
             [
-                "8117ab55748df23d"
+                "3792b003136a5ce7"
             ]
         ]
     },
@@ -261,8 +261,8 @@
         "override_payload": "msg",
         "entity_location": "data",
         "override_data": "msg",
-        "x": 580,
-        "y": 180,
+        "x": 840,
+        "y": 140,
         "wires": [
             [
                 "a7e723a161edc29f"
@@ -291,7 +291,7 @@
         "checkall": "true",
         "repair": false,
         "outputs": 2,
-        "x": 810,
+        "x": 1110,
         "y": 180,
         "wires": [
             [
@@ -319,8 +319,125 @@
         "bytopic": "all",
         "topic": "topic",
         "outputs": 1,
-        "x": 1010,
-        "y": 240,
+        "x": 1310,
+        "y": 100,
+        "wires": [
+            [
+                "339be7d4e536cee4"
+            ]
+        ]
+    },
+    {
+        "id": "3792b003136a5ce7",
+        "type": "api-current-state",
+        "z": "574dc86ef8f55d6a",
+        "name": "Zeitfenster aktiv?",
+        "server": "5266157.7ab9f6c",
+        "version": 3,
+        "outputs": 2,
+        "halt_if": "on",
+        "halt_if_type": "str",
+        "halt_if_compare": "is",
+        "entity_id": "binary_sensor.lastdynamik_zeitfenster_aktiv",
+        "state_type": "str",
+        "blockInputOverrides": true,
+        "outputProperties": [
+            {
+                "property": "payload",
+                "propertyType": "msg",
+                "value": "string",
+                "valueType": "entityState"
+            }
+        ],
+        "for": "0",
+        "forType": "num",
+        "forUnits": "minutes",
+        "override_topic": false,
+        "state_location": "payload",
+        "override_payload": "msg",
+        "entity_location": "data",
+        "override_data": "msg",
+        "x": 590,
+        "y": 180,
+        "wires": [
+            [
+                "8117ab55748df23d"
+            ],
+            [
+                "3194d4cc8fe09456"
+            ]
+        ]
+    },
+    {
+        "id": "3194d4cc8fe09456",
+        "type": "api-current-state",
+        "z": "574dc86ef8f55d6a",
+        "name": "Hole Festwerteinstellung",
+        "server": "5266157.7ab9f6c",
+        "version": 3,
+        "outputs": 1,
+        "halt_if": "",
+        "halt_if_type": "str",
+        "halt_if_compare": "is",
+        "entity_id": "input_number.wunsch_einspeisung",
+        "state_type": "num",
+        "blockInputOverrides": false,
+        "outputProperties": [
+            {
+                "property": "payload",
+                "propertyType": "msg",
+                "value": "string",
+                "valueType": "entityState"
+            }
+        ],
+        "for": "0",
+        "forType": "num",
+        "forUnits": "minutes",
+        "override_topic": false,
+        "state_location": "payload",
+        "override_payload": "msg",
+        "entity_location": "data",
+        "override_data": "msg",
+        "x": 850,
+        "y": 220,
+        "wires": [
+            [
+                "014a1271969bc296"
+            ]
+        ]
+    },
+    {
+        "id": "339be7d4e536cee4",
+        "type": "api-current-state",
+        "z": "574dc86ef8f55d6a",
+        "name": "Hole Hausverbrauch",
+        "server": "5266157.7ab9f6c",
+        "version": 3,
+        "outputs": 1,
+        "halt_if": "",
+        "halt_if_type": "str",
+        "halt_if_compare": "is",
+        "entity_id": "sensor.realer_echtzeit_hausverbrauch",
+        "state_type": "num",
+        "blockInputOverrides": false,
+        "outputProperties": [
+            {
+                "property": "payload",
+                "propertyType": "msg",
+                "value": "string",
+                "valueType": "entityState"
+            }
+        ],
+        "for": "0",
+        "forType": "num",
+        "forUnits": "minutes",
+        "override_topic": false,
+        "state_location": "payload",
+        "override_payload": "msg",
+        "entity_location": "data",
+        "override_data": "msg",
+        "x": 1540,
+        "y": 100,
         "wires": [
             [
                 "014a1271969bc296"
@@ -334,7 +451,7 @@
         "addon": true
     },
     {
-        "id": "bc7965b11d591123",
+        "id": "ac759cd4cd8af699",
         "type": "global-config",
         "env": [],
         "modules": {
